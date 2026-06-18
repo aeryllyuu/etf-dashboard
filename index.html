@@ -206,13 +206,6 @@ function render(){
   const main=document.getElementById("main");
   main.innerHTML="";
 
-  const tableCard=document.createElement("div");
-  tableCard.className="card";
-  tableCard.innerHTML=`<h2>${tab.key} &mdash; performance</h2>
-    <div class="meta">Change in shares/units outstanding over each period &middot; latest as of ${DATA.updated}</div>
-    <div class="tablewrap">${renderTable(tab)}</div>`;
-  main.appendChild(tableCard);
-
   const combCard=document.createElement("div");
   combCard.className="card";
   combCard.innerHTML=`<h2>${tab.key} &mdash; all ETFs</h2>
@@ -240,6 +233,13 @@ function render(){
     el.onclick=()=>{const ds=cc.data.datasets[i];ds.hidden=!ds.hidden;el.classList.toggle("off",ds.hidden);cc.update();};
     lg.appendChild(el);
   });
+
+  const tableCard=document.createElement("div");
+  tableCard.className="card";
+  tableCard.innerHTML=`<h2>${tab.key} &mdash; performance</h2>
+    <div class="meta">Change in shares/units outstanding over each period &middot; latest as of ${DATA.updated}</div>
+    <div class="tablewrap">${renderTable(tab)}</div>`;
+  main.appendChild(tableCard);
 
   const gridCard=document.createElement("div");
   gridCard.className="card";

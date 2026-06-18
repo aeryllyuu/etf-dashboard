@@ -44,6 +44,17 @@ main{padding:16px;max-width:1400px;margin:0 auto}
 .lg .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
 .lg.off{opacity:.35;text-decoration:line-through}
 .foot{color:var(--muted);font-size:11px;padding:0 16px 30px;text-align:center}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.perf{border-collapse:collapse;width:100%;font-size:12.5px;min-width:560px}
+table.perf th,table.perf td{padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+table.perf th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--panel)}
+table.perf td.name,table.perf th.name{text-align:left;position:sticky;left:0;background:var(--panel);z-index:1}
+table.perf td.name{font-weight:600}
+table.perf td.tk{color:var(--muted);font-size:11px;font-weight:400}
+table.perf tr:hover td{background:var(--panel2)}
+table.perf tr:hover td.name{background:var(--panel2)}
+.pos{color:#22c55e}.neg{color:#ef4444}.flat{color:var(--muted)}
+.units{color:var(--txt)}
 @media (max-width:640px){
   main{padding:12px}
   .combined-wrap{aspect-ratio:3/4}
@@ -124,10 +135,43 @@ function destroyCharts(){ charts.forEach(c=>c.destroy()); charts=[]; }
 const labelFmt=new Intl.DateTimeFormat("en",{month:"short",day:"numeric",year:"2-digit"});
 let dateObjs_w=[];
 function fmtNum(v){
-  if(v>=1e9)return (v/1e9).toFixed(1)+"B";
-  if(v>=1e6)return (v/1e6).toFixed(1)+"M";
-  if(v>=1e3)return (v/1e3).toFixed(1)+"K";
-  return v;
+  if(v>=1e9)return (v/1e9).toFixed(2)+"B";
+  if(v>=1e6)return (v/1e6).toFixed(2)+"M";
+  if(v>=1e3)return (v/1e3).toFixed(2)+"K";
+  return (+v).toFixed(2);
+}
+function lastVal(code){
+  const a=DATA.series[code];
+  for(let i=a.length-1;i>=0;i--){ if(a[i]!==null && a[i]!==0) return a[i]; }
+  return null;
+}
+function pctChange(code,tfKey){
+  const s=windowStart(tfKey), a=DATA.series[code];
+  let base=null;
+  for(let i=s;i<a.length;i++){ if(a[i]!==null && a[i]!==0){ base=a[i]; break; } }
+  const last=lastVal(code);
+  if(base===null || last===null) return null;
+  return (last/base-1)*100;
+}
+function pctCell(v){
+  if(v===null) return `<td class="flat">&ndash;</td>`;
+  const cls = v>0.05?"pos": v<-0.05?"neg":"flat";
+  const sign = v>0?"+":"";
+  return `<td class="${cls}">${sign}${v.toFixed(1)}%</td>`;
+}
+const PERF_TF=["1W","1M","3M","6M","YTD","1Y","3Y","Max"];
+function renderTable(tab){
+  let head=`<tr><th class="name">ETF</th><th>Latest units</th>`;
+  PERF_TF.forEach(k=>head+=`<th>${k}</th>`);
+  head+=`</tr>`;
+  let body="";
+  tab.codes.forEach(code=>{
+    const lv=lastVal(code);
+    body+=`<tr><td class="name">${nameOf[code]||code}<div class="tk">${tickerOf[code]||""}</div></td>`+
+      `<td class="units">${lv===null?"&ndash;":fmtNum(lv)}</td>`+
+      PERF_TF.map(k=>pctCell(pctChange(code,k))).join("")+`</tr>`;
+  });
+  return `<table class="perf"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 function commonOpts(isMini){
   return {
@@ -161,6 +205,13 @@ function render(){
   dateObjs_w=dateObjs.slice(s);
   const main=document.getElementById("main");
   main.innerHTML="";
+
+  const tableCard=document.createElement("div");
+  tableCard.className="card";
+  tableCard.innerHTML=`<h2>${tab.key} &mdash; performance</h2>
+    <div class="meta">Change in shares/units outstanding over each period &middot; latest as of ${DATA.updated}</div>
+    <div class="tablewrap">${renderTable(tab)}</div>`;
+  main.appendChild(tableCard);
 
   const combCard=document.createElement("div");
   combCard.className="card";

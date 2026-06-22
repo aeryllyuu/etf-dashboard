@@ -37,7 +37,9 @@ main{padding:16px;max-width:1400px;margin:0 auto}
 .combined-wrap{position:relative;width:100%;aspect-ratio:16/9}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
 .mini h3{font-size:13.5px;margin:0 0 1px}
-.mini .tk{font-size:11px;color:var(--muted);margin-bottom:8px}
+.mini .tk{font-size:11px;color:var(--muted);margin-bottom:6px}
+.minitf{background:var(--chip);color:var(--txt);border:1px solid var(--line);border-radius:6px;font-size:11px;font-weight:600;padding:3px 6px;margin:0 0 8px;cursor:pointer}
+.minitf:focus{outline:none;border-color:var(--accent)}
 .mini-wrap{position:relative;width:100%;aspect-ratio:16/10}
 .milegend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0 0 6px;font-size:10.5px;color:var(--muted)}
 .milegend span{display:inline-flex;align-items:center;gap:5px}
@@ -110,7 +112,7 @@ DATA.meta.forEach(m=>{nameOf[m.code]=m.name;tickerOf[m.code]=m.ticker});
 const dates=DATA.dates;
 const dateObjs=dates.map(d=>new Date(d+"T00:00:00"));
 
-let state={tab:0, tf:"6M", scale:"rebase", maByTab:{}};
+let state={tab:0, tf:"6M", scale:"rebase", maByTab:{}, miniTf:{}};
 
 function windowStart(tfKey){
   const n=dates.length, last=dateObjs[n-1];
@@ -183,7 +185,8 @@ function computeSignals(u,a,b){
 
 let charts=[];
 let maChart=null;
-function destroyCharts(){ charts.forEach(c=>c.destroy()); charts=[]; if(maChart){maChart.destroy(); maChart=null;} }
+let miniCharts=[];
+function destroyCharts(){ charts.forEach(c=>c.destroy()); charts=[]; if(maChart){maChart.destroy(); maChart=null;} miniCharts.forEach(c=>c&&c.destroy()); miniCharts=[]; }
 
 const labelFmt=new Intl.DateTimeFormat("en",{month:"short",day:"numeric",year:"2-digit"});
 let dateObjs_w=[];
@@ -344,23 +347,33 @@ function render(){
   const gridCard=document.createElement("div");
   gridCard.className="card";
   gridCard.innerHTML=`<h2>${tab.key} &mdash; individual ETFs</h2>
-    <div class="meta">${state.scale==="rebase"?"Rebased to 100":"Outstanding units"} &middot; ${state.tf}</div>
+    <div class="meta">${state.scale==="rebase"?"Rebased to 100":"Outstanding units"} &middot; each chart has its own time horizon</div>
     <div class="grid" id="grid"></div>`;
   main.appendChild(gridCard);
   const grid=document.getElementById("grid");
   tab.codes.forEach((code,i)=>{
+    const col=PALETTE[i%PALETTE.length];
+    const cur=state.miniTf[code]||state.tf;
     const cell=document.createElement("div");
     cell.className="mini";
     cell.innerHTML=`<h3>${nameOf[code]||code}</h3><div class="tk">${tickerOf[code]||""}</div>
+      <select class="minitf">${TIMEFRAMES.map(([k])=>`<option value="${k}"${k===cur?" selected":""}>${k}</option>`).join("")}</select>
       <div class="mini-wrap"><canvas></canvas></div>`;
     grid.appendChild(cell);
     const ctx=cell.querySelector("canvas");
-    const c=new Chart(ctx,{type:"line",
-      data:{labels,datasets:[{label:code,data:sliceSeries(code,s),
-        borderColor:PALETTE[i%PALETTE.length],backgroundColor:"rgba(79,140,255,0.08)",
-        fill:true}]},
-      options:commonOpts(true)});
-    charts.push(c);
+    let miniChart=null;
+    function drawMini(tfKey){
+      const ms=windowStart(tfKey);
+      const mlabels=dates.slice(ms).map(d=>{const o=new Date(d+"T00:00:00");return labelFmt.format(o);});
+      if(miniChart){ const ix=miniCharts.indexOf(miniChart); if(ix>=0) miniCharts.splice(ix,1); miniChart.destroy(); }
+      miniChart=new Chart(ctx,{type:"line",
+        data:{labels:mlabels,datasets:[{label:code,data:sliceSeries(code,ms),
+          borderColor:col,backgroundColor:"rgba(79,140,255,0.08)",fill:true}]},
+        options:commonOpts(true)});
+      miniCharts.push(miniChart);
+    }
+    drawMini(cur);
+    cell.querySelector(".minitf").onchange=(e)=>{ state.miniTf[code]=e.target.value; drawMini(e.target.value); };
   });
 }
 

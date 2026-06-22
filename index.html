@@ -42,6 +42,9 @@ main{padding:16px;max-width:1400px;margin:0 auto}
 .milegend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0 0 6px;font-size:10.5px;color:var(--muted)}
 .milegend span{display:inline-flex;align-items:center;gap:5px}
 .milegend i{width:11px;height:3px;border-radius:2px;display:inline-block}
+.ma-item{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.ma-item h3{font-size:14px;margin:0 0 2px}
+.ma-item h3 .tk{font-weight:400;font-size:11px;color:var(--muted)}
 .legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px}
 .lg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer}
 .lg .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
@@ -264,6 +267,38 @@ function render(){
     lg.appendChild(el);
   });
 
+  const maCard=document.createElement("div");
+  maCard.className="card";
+  let maInner=`<h2>${tab.key} &mdash; holding units vs moving averages</h2>
+    <div class="meta">Holding units with 5-day &amp; 10-day moving averages &middot; ${state.scale==="rebase"?"rebased to 100":"units"} &middot; ${state.tf}</div>`;
+  tab.codes.forEach((code,i)=>{
+    const col=PALETTE[i%PALETTE.length];
+    maInner+=`<div class="ma-item">
+      <h3>${nameOf[code]||code} <span class="tk">${tickerOf[code]||""}</span></h3>
+      <div class="milegend">
+        <span><i style="background:${col}"></i>Holding units</span>
+        <span><i style="background:${MA5_COLOR}"></i>5MA</span>
+        <span><i style="background:${MA10_COLOR}"></i>10MA</span>
+      </div>
+      <div class="combined-wrap"><canvas data-ma="${code}"></canvas></div>
+    </div>`;
+  });
+  maCard.innerHTML=maInner;
+  main.appendChild(maCard);
+  tab.codes.forEach((code,i)=>{
+    const col=PALETTE[i%PALETTE.length];
+    const ctx=maCard.querySelector(`canvas[data-ma="${code}"]`);
+    const sd=indivSeries(code,s);
+    const c=new Chart(ctx,{type:"line",
+      data:{labels,datasets:[
+        {label:"Holding units",data:sd.units,borderColor:col,backgroundColor:"rgba(79,140,255,0.07)",fill:true,borderWidth:1.8},
+        {label:"5MA",data:sd.ma5,borderColor:MA5_COLOR,borderWidth:1.4,fill:false},
+        {label:"10MA",data:sd.ma10,borderColor:MA10_COLOR,borderWidth:1.4,fill:false,borderDash:[5,3]}
+      ]},
+      options:commonOpts(false)});
+    charts.push(c);
+  });
+
   const tableCard=document.createElement("div");
   tableCard.className="card";
   tableCard.innerHTML=`<h2>${tab.key} &mdash; performance</h2>
@@ -274,31 +309,21 @@ function render(){
   const gridCard=document.createElement("div");
   gridCard.className="card";
   gridCard.innerHTML=`<h2>${tab.key} &mdash; individual ETFs</h2>
-    <div class="meta">Holding units with 5-day &amp; 10-day moving averages &middot; ${state.scale==="rebase"?"rebased to 100":"units"} &middot; ${state.tf}</div>
+    <div class="meta">${state.scale==="rebase"?"Rebased to 100":"Outstanding units"} &middot; ${state.tf}</div>
     <div class="grid" id="grid"></div>`;
   main.appendChild(gridCard);
   const grid=document.getElementById("grid");
   tab.codes.forEach((code,i)=>{
-    const col=PALETTE[i%PALETTE.length];
     const cell=document.createElement("div");
     cell.className="mini";
     cell.innerHTML=`<h3>${nameOf[code]||code}</h3><div class="tk">${tickerOf[code]||""}</div>
-      <div class="milegend">
-        <span><i style="background:${col}"></i>Holding units</span>
-        <span><i style="background:${MA5_COLOR}"></i>5MA</span>
-        <span><i style="background:${MA10_COLOR}"></i>10MA</span>
-      </div>
       <div class="mini-wrap"><canvas></canvas></div>`;
     grid.appendChild(cell);
     const ctx=cell.querySelector("canvas");
-    const sd=indivSeries(code,s);
     const c=new Chart(ctx,{type:"line",
-      data:{labels,datasets:[
-        {label:"Holding units",data:sd.units,borderColor:col,
-          backgroundColor:"rgba(79,140,255,0.07)",fill:true,borderWidth:1.7},
-        {label:"5MA",data:sd.ma5,borderColor:MA5_COLOR,borderWidth:1.2,fill:false,borderDash:[]},
-        {label:"10MA",data:sd.ma10,borderColor:MA10_COLOR,borderWidth:1.2,fill:false,borderDash:[4,3]}
-      ]},
+      data:{labels,datasets:[{label:code,data:sliceSeries(code,s),
+        borderColor:PALETTE[i%PALETTE.length],backgroundColor:"rgba(79,140,255,0.08)",
+        fill:true}]},
       options:commonOpts(true)});
     charts.push(c);
   });

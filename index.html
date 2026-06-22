@@ -42,6 +42,9 @@ main{padding:16px;max-width:1400px;margin:0 auto}
 .milegend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0 0 6px;font-size:10.5px;color:var(--muted)}
 .milegend span{display:inline-flex;align-items:center;gap:5px}
 .milegend i{width:11px;height:3px;border-radius:2px;display:inline-block}
+.milegend i.tri{width:0;height:0;background:transparent!important;border-radius:0;border-left:5px solid transparent;border-right:5px solid transparent}
+.milegend i.tri.up{border-bottom:8px solid #22c55e}
+.milegend i.tri.dn{border-top:8px solid #ef4444}
 .ma-item{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
 .ma-item h3{font-size:14px;margin:0 0 2px}
 .ma-item h3 .tk{font-weight:400;font-size:11px;color:var(--muted)}
@@ -161,6 +164,22 @@ function indivSeries(code,s){
   return {units:reb(u),ma5:reb(a),ma10:reb(b)};
 }
 const MA5_COLOR="#f59e0b", MA10_COLOR="#38bdf8";
+const BUY_COLOR="#22c55e", SELL_COLOR="#ef4444";
+// Buy = units>5MA AND 5MA>10MA (mark entry); Sell = units<5MA AND 5MA<10MA (mark entry)
+function computeSignals(u,a,b){
+  const buy=u.map(()=>null), sell=u.map(()=>null);
+  let prev=0;
+  for(let i=0;i<u.length;i++){
+    if(u[i]==null||a[i]==null||b[i]==null) continue;
+    let st=0;
+    if(u[i]>a[i] && a[i]>b[i]) st=1;
+    else if(u[i]<a[i] && a[i]<b[i]) st=-1;
+    if(st===1 && prev!==1) buy[i]=u[i];
+    if(st===-1 && prev!==-1) sell[i]=u[i];
+    if(st!==0) prev=st;
+  }
+  return {buy,sell};
+}
 
 let charts=[];
 let maChart=null;
@@ -289,14 +308,19 @@ function render(){
     maCard.querySelector("#maLegend").innerHTML=
       `<span><i style="background:${col}"></i>Holding units</span>`+
       `<span><i style="background:${MA5_COLOR}"></i>5MA</span>`+
-      `<span><i style="background:${MA10_COLOR}"></i>10MA</span>`;
+      `<span><i style="background:${MA10_COLOR}"></i>10MA</span>`+
+      `<span><i class="tri up"></i>Buy</span>`+
+      `<span><i class="tri dn"></i>Sell</span>`;
     if(maChart){ maChart.destroy(); maChart=null; }
     const sd=indivSeries(code,s);
+    const sig=computeSignals(sd.units,sd.ma5,sd.ma10);
     maChart=new Chart(maCard.querySelector("#maCanvas"),{type:"line",
       data:{labels,datasets:[
-        {label:"Holding units",data:sd.units,borderColor:col,backgroundColor:"rgba(79,140,255,0.07)",fill:true,borderWidth:1.8},
-        {label:"5MA",data:sd.ma5,borderColor:MA5_COLOR,borderWidth:1.4,fill:false},
-        {label:"10MA",data:sd.ma10,borderColor:MA10_COLOR,borderWidth:1.4,fill:false,borderDash:[5,3]}
+        {label:"Holding units",data:sd.units,borderColor:col,backgroundColor:"rgba(79,140,255,0.07)",fill:true,borderWidth:1.8,order:3},
+        {label:"5MA",data:sd.ma5,borderColor:MA5_COLOR,borderWidth:1.4,fill:false,order:2},
+        {label:"10MA",data:sd.ma10,borderColor:MA10_COLOR,borderWidth:1.4,fill:false,borderDash:[5,3],order:2},
+        {label:"Buy",data:sig.buy,borderColor:BUY_COLOR,backgroundColor:BUY_COLOR,showLine:false,pointStyle:"triangle",pointRadius:8,pointHoverRadius:10,order:0},
+        {label:"Sell",data:sig.sell,borderColor:SELL_COLOR,backgroundColor:SELL_COLOR,showLine:false,pointStyle:"triangle",rotation:180,pointRadius:8,pointHoverRadius:10,order:0}
       ]},
       options:commonOpts(false)});
   }

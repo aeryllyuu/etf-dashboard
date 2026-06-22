@@ -368,7 +368,7 @@ function render(){
       if(miniChart){ const ix=miniCharts.indexOf(miniChart); if(ix>=0) miniCharts.splice(ix,1); miniChart.destroy(); }
       miniChart=new Chart(ctx,{type:"line",
         data:{labels:mlabels,datasets:[{label:code,data:sliceSeries(code,ms),
-          borderColor:col,backgroundColor:"rgba(79,140,255,0.08)",fill:true}]},
+          borderColor:"#38bdf8",backgroundColor:"rgba(56,189,248,0.10)",fill:true}]},
         options:commonOpts(true)});
       miniCharts.push(miniChart);
     }

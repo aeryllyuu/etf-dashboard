@@ -39,6 +39,9 @@ main{padding:16px;max-width:1400px;margin:0 auto}
 .mini h3{font-size:13.5px;margin:0 0 1px}
 .mini .tk{font-size:11px;color:var(--muted);margin-bottom:8px}
 .mini-wrap{position:relative;width:100%;aspect-ratio:16/10}
+.milegend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:0 0 6px;font-size:10.5px;color:var(--muted)}
+.milegend span{display:inline-flex;align-items:center;gap:5px}
+.milegend i{width:11px;height:3px;border-radius:2px;display:inline-block}
 .legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px}
 .lg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer}
 .lg .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
@@ -128,6 +131,33 @@ function sliceSeries(code,s){
   if(base===null) return seg.map(()=>null);
   return seg.map(v=> (v===null)? null : +( (v/base)*100 ).toFixed(2));
 }
+
+function movingAvg(arr,n){
+  const out=new Array(arr.length).fill(null);
+  const buf=[];
+  for(let i=0;i<arr.length;i++){
+    const v=arr[i];
+    if(v!==null && v!==0){
+      buf.push(v); if(buf.length>n) buf.shift();
+      if(buf.length===n) out[i]=+(buf.reduce((a,b)=>a+b,0)/n).toFixed(4);
+    }
+  }
+  return out;
+}
+// returns {units, ma5, ma10} sliced to window, rebased together if scale=rebase
+function indivSeries(code,s){
+  const raw=DATA.series[code];
+  const u=raw.slice(s);
+  const a=movingAvg(raw,5).slice(s);
+  const b=movingAvg(raw,10).slice(s);
+  if(state.scale==="units") return {units:u,ma5:a,ma10:b};
+  let base=null;
+  for(const v of u){ if(v!==null && v!==0){ base=v; break; } }
+  const reb=arr=> base===null? arr.map(()=>null)
+    : arr.map(v=> v===null? null : +((v/base)*100).toFixed(2));
+  return {units:reb(u),ma5:reb(a),ma10:reb(b)};
+}
+const MA5_COLOR="#f59e0b", MA10_COLOR="#38bdf8";
 
 let charts=[];
 function destroyCharts(){ charts.forEach(c=>c.destroy()); charts=[]; }
@@ -244,21 +274,31 @@ function render(){
   const gridCard=document.createElement("div");
   gridCard.className="card";
   gridCard.innerHTML=`<h2>${tab.key} &mdash; individual ETFs</h2>
-    <div class="meta">${state.scale==="rebase"?"Rebased to 100":"Outstanding units"} &middot; ${state.tf}</div>
+    <div class="meta">Holding units with 5-day &amp; 10-day moving averages &middot; ${state.scale==="rebase"?"rebased to 100":"units"} &middot; ${state.tf}</div>
     <div class="grid" id="grid"></div>`;
   main.appendChild(gridCard);
   const grid=document.getElementById("grid");
   tab.codes.forEach((code,i)=>{
+    const col=PALETTE[i%PALETTE.length];
     const cell=document.createElement("div");
     cell.className="mini";
     cell.innerHTML=`<h3>${nameOf[code]||code}</h3><div class="tk">${tickerOf[code]||""}</div>
+      <div class="milegend">
+        <span><i style="background:${col}"></i>Holding units</span>
+        <span><i style="background:${MA5_COLOR}"></i>5MA</span>
+        <span><i style="background:${MA10_COLOR}"></i>10MA</span>
+      </div>
       <div class="mini-wrap"><canvas></canvas></div>`;
     grid.appendChild(cell);
     const ctx=cell.querySelector("canvas");
+    const sd=indivSeries(code,s);
     const c=new Chart(ctx,{type:"line",
-      data:{labels,datasets:[{label:code,data:sliceSeries(code,s),
-        borderColor:PALETTE[i%PALETTE.length],backgroundColor:"rgba(79,140,255,0.08)",
-        fill:true}]},
+      data:{labels,datasets:[
+        {label:"Holding units",data:sd.units,borderColor:col,
+          backgroundColor:"rgba(79,140,255,0.07)",fill:true,borderWidth:1.7},
+        {label:"5MA",data:sd.ma5,borderColor:MA5_COLOR,borderWidth:1.2,fill:false,borderDash:[]},
+        {label:"10MA",data:sd.ma10,borderColor:MA10_COLOR,borderWidth:1.2,fill:false,borderDash:[4,3]}
+      ]},
       options:commonOpts(true)});
     charts.push(c);
   });

@@ -107,7 +107,7 @@ DATA.meta.forEach(m=>{nameOf[m.code]=m.name;tickerOf[m.code]=m.ticker});
 const dates=DATA.dates;
 const dateObjs=dates.map(d=>new Date(d+"T00:00:00"));
 
-let state={tab:0, tf:"6M", scale:"rebase"};
+let state={tab:0, tf:"6M", scale:"rebase", maByTab:{}};
 
 function windowStart(tfKey){
   const n=dates.length, last=dateObjs[n-1];
@@ -163,7 +163,8 @@ function indivSeries(code,s){
 const MA5_COLOR="#f59e0b", MA10_COLOR="#38bdf8";
 
 let charts=[];
-function destroyCharts(){ charts.forEach(c=>c.destroy()); charts=[]; }
+let maChart=null;
+function destroyCharts(){ charts.forEach(c=>c.destroy()); charts=[]; if(maChart){maChart.destroy(); maChart=null;} }
 
 const labelFmt=new Intl.DateTimeFormat("en",{month:"short",day:"numeric",year:"2-digit"});
 let dateObjs_w=[];
@@ -269,35 +270,45 @@ function render(){
 
   const maCard=document.createElement("div");
   maCard.className="card";
-  let maInner=`<h2>${tab.key} &mdash; holding units vs moving averages</h2>
-    <div class="meta">Holding units with 5-day &amp; 10-day moving averages &middot; ${state.scale==="rebase"?"rebased to 100":"units"} &middot; ${state.tf}</div>`;
-  tab.codes.forEach((code,i)=>{
-    const col=PALETTE[i%PALETTE.length];
-    maInner+=`<div class="ma-item">
-      <h3>${nameOf[code]||code} <span class="tk">${tickerOf[code]||""}</span></h3>
-      <div class="milegend">
-        <span><i style="background:${col}"></i>Holding units</span>
-        <span><i style="background:${MA5_COLOR}"></i>5MA</span>
-        <span><i style="background:${MA10_COLOR}"></i>10MA</span>
-      </div>
-      <div class="combined-wrap"><canvas data-ma="${code}"></canvas></div>
-    </div>`;
-  });
-  maCard.innerHTML=maInner;
+  maCard.innerHTML=`<h2>${tab.key} &mdash; holding units vs moving averages</h2>
+    <div class="meta" id="maMeta"></div>
+    <div class="chips" id="maSel" style="margin-bottom:12px"></div>
+    <div class="milegend" id="maLegend"></div>
+    <div class="combined-wrap"><canvas id="maCanvas"></canvas></div>`;
   main.appendChild(maCard);
-  tab.codes.forEach((code,i)=>{
-    const col=PALETTE[i%PALETTE.length];
-    const ctx=maCard.querySelector(`canvas[data-ma="${code}"]`);
+  const maSel=maCard.querySelector("#maSel");
+  let sel = state.maByTab[tab.key];
+  if(!sel || !tab.codes.includes(sel)) sel=tab.codes[0];
+  function drawMA(code){
+    state.maByTab[tab.key]=code;
+    [...maSel.children].forEach(x=>x.classList.toggle("on",x.dataset.code===code));
+    const idx=tab.codes.indexOf(code);
+    const col=PALETTE[idx%PALETTE.length];
+    maCard.querySelector("#maMeta").innerHTML=
+      `${nameOf[code]||code} &middot; ${tickerOf[code]||""} &middot; ${state.scale==="rebase"?"rebased to 100":"units"} &middot; ${state.tf}`;
+    maCard.querySelector("#maLegend").innerHTML=
+      `<span><i style="background:${col}"></i>Holding units</span>`+
+      `<span><i style="background:${MA5_COLOR}"></i>5MA</span>`+
+      `<span><i style="background:${MA10_COLOR}"></i>10MA</span>`;
+    if(maChart){ maChart.destroy(); maChart=null; }
     const sd=indivSeries(code,s);
-    const c=new Chart(ctx,{type:"line",
+    maChart=new Chart(maCard.querySelector("#maCanvas"),{type:"line",
       data:{labels,datasets:[
         {label:"Holding units",data:sd.units,borderColor:col,backgroundColor:"rgba(79,140,255,0.07)",fill:true,borderWidth:1.8},
         {label:"5MA",data:sd.ma5,borderColor:MA5_COLOR,borderWidth:1.4,fill:false},
         {label:"10MA",data:sd.ma10,borderColor:MA10_COLOR,borderWidth:1.4,fill:false,borderDash:[5,3]}
       ]},
       options:commonOpts(false)});
-    charts.push(c);
+  }
+  tab.codes.forEach(code=>{
+    const el=document.createElement("div");
+    el.className="chip"+(code===sel?" on":"");
+    el.dataset.code=code;
+    el.textContent=code;
+    el.onclick=()=>drawMA(code);
+    maSel.appendChild(el);
   });
+  drawMA(sel);
 
   const tableCard=document.createElement("div");
   tableCard.className="card";

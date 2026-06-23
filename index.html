@@ -368,7 +368,6 @@ function render(){
     cell.className="mini";
     cell.innerHTML=`<h3>${nameOf[code]||code}</h3><div class="tk">${tickerOf[code]||""}</div>
       <select class="minitf">${TIMEFRAMES.map(([k])=>`<option value="${k}"${k===cur?" selected":""}>${k}</option>`).join("")}</select>
-      <div class="milegend"><span><i style="background:#38bdf8"></i>Holding units</span><span><i style="background:#f59e0b"></i>Price</span></div>
       <div class="mini-wrap"><canvas></canvas></div>`;
     grid.appendChild(cell);
     const ctx=cell.querySelector("canvas");
@@ -378,10 +377,8 @@ function render(){
       const mlabels=dates.slice(ms).map(d=>{const o=new Date(d+"T00:00:00");return labelFmt.format(o);});
       if(miniChart){ const ix=miniCharts.indexOf(miniChart); if(ix>=0) miniCharts.splice(ix,1); miniChart.destroy(); }
       miniChart=new Chart(ctx,{type:"line",
-        data:{labels:mlabels,datasets:[
-          {label:"Holding units",data:sliceSeries(code,ms),borderColor:"#38bdf8",backgroundColor:"rgba(56,189,248,0.10)",fill:true,borderWidth:1.6},
-          {label:"Price",data:rebaseSlice(DATA.px[code],ms),borderColor:"#f59e0b",backgroundColor:"transparent",fill:false,borderWidth:1.3}
-        ]},
+        data:{labels:mlabels,datasets:[{label:code,data:sliceSeries(code,ms),
+          borderColor:"#38bdf8",backgroundColor:"rgba(56,189,248,0.10)",fill:true}]},
         options:commonOpts(true)});
       miniCharts.push(miniChart);
     }
